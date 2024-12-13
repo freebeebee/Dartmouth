@@ -1,23 +1,3 @@
-def preprocess_logits_for_metrics(logits, labels):
-            if isinstance(logits, tuple):
-                logits = logits[0]
-            return logits.argmax(dim=-1)
-
-def compute_metrics(eval_preds):
-            preds, labels = eval_preds
-            print(preds, labels)
-
-            return metric.compute(predictions=preds, references=labels)
-
-def compute_metrics_last(eval_preds):
-            preds, labels = eval_preds 
-            print(f"Confusion Matrix = \n{confusion_matrix(preds, labels)}")
-            return{
-                'Accuracy' : accuracy_score(preds, labels),
-                'Precision' : precision_score(preds, labels, average='macro'),
-                'Recall' : recall_score(preds, labels, average='macro'),
-                'F1' : f1_score(preds, labels, average='macro')
-            }
 # Checkpointing and Configuring the dataset
 parser = HfArgumentParser((ModelArguments, DataTrainingArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
@@ -56,9 +36,21 @@ parser = HfArgumentParser((ModelArguments, DataTrainingArguments, TrainingArgume
     if training_args.do_eval:
         eval_dataset = lm_datasets["validation"]
         metric = evaluate.load("accuracy")
+
+        def preprocess_logits_for_metrics(logits, labels):
+            if isinstance(logits, tuple):
+                logits = logits[0]
+            return logits.argmax(dim=-1)
+        def compute_metrics(eval_preds):
+            preds, labels = eval_preds
+            print(preds, labels)
+            return metric.compute(predictions=preds, references=labels)
         
     trainer = Trainer(
-        # Due to the line limit, the code is omitted
+        # Due to the line limit, somes code is omitted
+        preprocess_logits_for_metrics=preprocess_logits_for_metrics,
+        data_collator=default_data_collator,
+        compute_metrics=compute_metrics 
     )
 
     # start traning or evaluating
@@ -84,10 +76,19 @@ parser = HfArgumentParser((ModelArguments, DataTrainingArguments, TrainingArgume
             accuracy_score, 
             f1_score, precision_score, recall_score
         )
+        # print out the final result
+        def compute_metrics_last(eval_preds):
+            preds, labels = eval_preds 
+            print(f"Confusion Matrix = \n{confusion_matrix(preds, labels)}")
+            return{
+                'Accuracy' : accuracy_score(preds, labels),
+                'Precision' : precision_score(preds, labels, average='macro'),
+                'Recall' : recall_score(preds, labels, average='macro'),
+                'F1' : f1_score(preds, labels, average='macro')
+            }
         trainer.compute_metrics = compute_metrics_last
         
         logger.info("*** Evaluate ***")
-
         metrics = trainer.evaluate()
         metrics["eval_samples"] = len(eval_dataset)
 
